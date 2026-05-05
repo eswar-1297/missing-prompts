@@ -1,0 +1,99 @@
+.dashboard { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.dashboard-kw-banner {
+  font-size: 1.05rem;
+  color: var(--color-text-muted);
+  padding: 0.5rem 0;
+}
+.dashboard-kw-count { font-size: 0.9rem; }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.summary-card {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  box-shadow: var(--shadow);
+}
+.summary-card--highlight {
+  border-color: var(--color-success);
+  background: #f0faf8;
+}
+.summary-card--cf {
+  border-color: #0057b8;
+  background: #e8f0fe;
+}
+.summary-card-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.summary-card--highlight .summary-card-value { color: var(--color-success); }
+.summary-card--cf .summary-card-value { color: var(--color-primary-dark); }
+.summary-card-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.competitor-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 640px) { .competitor-summary-row { grid-template-columns: 1fr; } }
+
+.competitor-summary {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+.competitor-summary-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+.competitor-none { font-size: 0.9rem; color: var(--color-text-muted); font-style: italic; }
+.competitor-list { list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
+.competitor-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.competitor-name { font-weight: 500; }
+.competitor-count {
+  background: #e8f0fe;
+  color: var(--color-primary);
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+}
+.competitor-count--cited {
+  background: #fde8ea;
+  color: var(--color-danger);
+}
+
+.dashboard-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 0.5rem;
+}
+
+.prompt-list { display: flex; flex-direction: column; gap: 1.5rem; }
