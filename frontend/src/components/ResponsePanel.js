@@ -244,7 +244,7 @@ function CitationItem({ citation, type }) {
         className="citation-link"
         title={citation.url}
       >
-        <span className="citation-domain">{domain}</span>
+        {domain && <span className="citation-domain">{domain}</span>}
         <span className="citation-title">{citation.title || citation.url}</span>
       </a>
     </li>
@@ -253,7 +253,10 @@ function CitationItem({ citation, type }) {
 
 function getDomain(url) {
   try {
-    return new URL(url).hostname.replace('www.', '');
+    const hostname = new URL(url).hostname.replace('www.', '');
+    // Gemini 2.0 wraps real URLs in Google redirect — don't show that as the domain
+    if (hostname.includes('vertexaisearch') || hostname.includes('googleapis.com')) return null;
+    return hostname;
   } catch {
     return url;
   }

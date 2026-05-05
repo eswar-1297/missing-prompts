@@ -84,13 +84,23 @@ function analyzeResponse(text, citations = []) {
 
   for (const citation of citations) {
     const urlLower = (citation.url || '').toLowerCase();
-    if (urlLower.includes(CLOUDFUZE_DOMAIN)) {
+    // Gemini 2.0 wraps real URLs in vertexaisearch redirect URLs.
+    // Fall back to matching on the page title when the URL doesn't contain the domain.
+    const titleLower = (citation.title || '').toLowerCase();
+
+    const matchesDomain = (domain) => urlLower.includes(domain);
+    const matchesTitle = (brand) => {
+      const b = brand.toLowerCase();
+      return new RegExp(`\\b${b}\\b`).test(titleLower);
+    };
+
+    if (matchesDomain(CLOUDFUZE_DOMAIN) || matchesTitle('cloudfuze')) {
       cloudfuzeCitations.push(citation);
       continue;
     }
     let matched = false;
     for (const [name, domain] of Object.entries(COMPETITOR_DOMAINS)) {
-      if (urlLower.includes(domain)) {
+      if (matchesDomain(domain) || matchesTitle(name)) {
         if (!competitorCitations[name]) competitorCitations[name] = [];
         competitorCitations[name].push(citation);
         matched = true;
