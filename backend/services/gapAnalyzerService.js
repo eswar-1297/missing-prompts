@@ -1,3 +1,5 @@
+const https = require('https');
+const http = require('http');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { fetchPageContent } = require('./pageContentService');
@@ -323,19 +325,65 @@ async function runGroundedSearch(searchPrompt, label) {
   return { text, chunks };
 }
 
-// Append the real source URLs from Gemini's grounding metadata.
-function formatResearch(res) {
-  const sources = [];
-  for (const chunk of res.chunks || []) {
-    if (chunk.web?.uri) {
-      const title = chunk.web.title || chunk.web.uri;
-      sources.push(`- ${title} :: ${chunk.web.uri}`);
-    }
-  }
+// Append the real source URLs from Gemini's grounding metadata. Gemini returns each
+// source as an ephemeral "vertexaisearch" redirect URL that expires (and then falls back
+// to the site homepage). Resolve them now, while fresh, to the real publisher page URL so
+// the cited source links straight to the exact page — permanently.
+async function formatResearch(res) {
+  const chunks = (res.chunks || []).filter(c => c.web?.uri);
+  const resolvedUrls = await Promise.all(
+    chunks.map(c => resolveGroundingUrl(c.web.uri))
+  );
+
+  const sources = chunks.map((c, i) => {
+    const title = c.web.title || resolvedUrls[i];
+    return `- ${title} :: ${resolvedUrls[i]}`;
+  });
+
   const sourceBlock = sources.length > 0
     ? `\n\n=== SOURCES (real URLs — use these as the "source" for any quote) ===\n${sources.join('\n')}`
     : '';
   return res.text + sourceBlock;
+}
+
+// Follow a Gemini grounding redirect to the real publisher URL. Only follows hops while
+// still on Google's redirect host, so we stop at the publisher's actual page URL (and
+// don't chase the publisher's own redirects, e.g. a missing page bouncing to its homepage).
+function resolveGroundingUrl(url, hops = 0) {
+  return new Promise((resolve) => {
+    if (hops > 4) return resolve(url);
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return resolve(url);
+    }
+
+    // Once we've left Google's redirect host, this is the real publisher URL — keep it.
+    const isGroundingRedirect = /vertexaisearch|grounding-api-redirect/i.test(parsed.hostname + parsed.pathname);
+    if (!isGroundingRedirect) return resolve(url);
+
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const req = lib.request(
+      url,
+      { method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 8000 },
+      (res) => {
+        const { statusCode } = res;
+        const location = res.headers.location;
+        res.destroy(); // we only need the headers, not the body
+        if (statusCode >= 300 && statusCode < 400 && location) {
+          const next = new URL(location, url).href;
+          resolveGroundingUrl(next, hops + 1).then(resolve);
+        } else {
+          resolve(url);
+        }
+      }
+    );
+    req.on('timeout', () => { req.destroy(); resolve(url); });
+    req.on('error', () => resolve(url));
+    req.end();
+  });
 }
 
 // ---------------------------------------------------------------------------
