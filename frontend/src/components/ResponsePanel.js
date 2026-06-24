@@ -17,6 +17,21 @@ const COMPETITOR_DOMAINS = {
   MigrationWiz: 'migrationwiz.com'
 };
 
+// Citations matched by title (not domain) carry a Gemini "vertexaisearch" redirect URL
+// whose host is google's, not the competitor's. The gap-analysis API only accepts URLs on
+// the competitor's own domain, so use the cited URL only when it really is on that domain;
+// otherwise fall back to the competitor homepage (grounding search still finds the pages).
+function pickCompetitorUrl(name, citedUrl) {
+  const domain = COMPETITOR_DOMAINS[name];
+  if (citedUrl) {
+    try {
+      const host = new URL(citedUrl).hostname.replace(/^www\./, '');
+      if (host === domain || host.endsWith(`.${domain}`)) return citedUrl;
+    } catch { /* malformed URL — fall through to homepage */ }
+  }
+  return `https://www.${domain}`;
+}
+
 function ResponsePanel({ title, accentColor, response, citations = [], analysis, prompt }) {
   const [showFull, setShowFull] = useState(false);
   const [showCitations, setShowCitations] = useState(true);
@@ -51,7 +66,7 @@ function ResponsePanel({ title, accentColor, response, citations = [], analysis,
     .filter(name => COMPETITOR_DOMAINS[name])
     .map(name => ({
       name,
-      url: competitorCitations[name]?.[0]?.url || `https://www.${COMPETITOR_DOMAINS[name]}`
+      url: pickCompetitorUrl(name, competitorCitations[name]?.[0]?.url)
     }));
 
   const cloudfuzeAbsent = !cloudfuzeMentioned && cloudfuzeCitations.length === 0;
