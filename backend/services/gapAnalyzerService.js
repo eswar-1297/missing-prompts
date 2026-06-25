@@ -3,6 +3,7 @@ const http = require('http');
 const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { fetchPageContent } = require('./pageContentService');
+const { withGeminiRetry } = require('./geminiService');
 
 const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -304,7 +305,8 @@ async function runGroundedSearch(searchPrompt, label) {
     tools: [{ googleSearch: {} }]
   });
 
-  const result = await model.generateContent(searchPrompt);
+  // Retry transient failures (429, transient 400 API_KEY_INVALID under load, 5xx, network).
+  const result = await withGeminiRetry(() => model.generateContent(searchPrompt), `gap:${label}`);
   const candidate = result.response?.candidates?.[0];
   const finishReason = candidate?.finishReason;
 

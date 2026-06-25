@@ -9,34 +9,46 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function is429(err) {
+// Transient failures worth retrying. Beyond plain rate-limits (429), Gemini's grounded
+// search endpoint intermittently returns a 400 API_KEY_INVALID under burst load even when
+// the key is valid — retrying clears it. Also covers 5xx server errors and network blips.
+// A genuinely invalid key still fails every attempt, so it surfaces after the retries.
+function isTransientError(err) {
+  const msg = err?.message || '';
+  const status = err?.status;
   return (
-    err?.status === 429 ||
-    err?.message?.includes('429') ||
-    err?.message?.includes('Resource exhausted') ||
-    err?.message?.includes('RESOURCE_EXHAUSTED')
+    status === 429 || /\b429\b|RESOURCE_EXHAUSTED|Resource exhausted/i.test(msg) ||
+    /API_KEY_INVALID|API key not valid/i.test(msg) ||
+    (typeof status === 'number' && status >= 500) ||
+    /\b5\d\d\b|INTERNAL|UNAVAILABLE|overloaded|deadline/i.test(msg) ||
+    /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|fetch failed/i.test(msg)
   );
 }
 
-async function queryGemini(prompt) {
+// Runs an async Gemini call with exponential backoff (3s, 6s, 12s, 24s) on transient errors.
+// Shared by the main analysis and the gap-analysis agent's grounded searches.
+async function withGeminiRetry(fn, label = 'Gemini') {
   let lastErr;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
-      // Exponential backoff: 3s, 6s, 12s, 24s
       await sleep(BASE_DELAY_MS * Math.pow(2, attempt - 1));
     }
 
     try {
-      return await callGemini(prompt);
+      return await fn();
     } catch (err) {
       lastErr = err;
-      if (!is429(err) || attempt === MAX_RETRIES) throw err;
-      console.warn(`[Gemini] 429 on attempt ${attempt + 1}, retrying after backoff...`);
+      if (!isTransientError(err) || attempt === MAX_RETRIES) throw err;
+      console.warn(`[${label}] transient error on attempt ${attempt + 1} (${(err.message || '').slice(0, 80)}), retrying after backoff...`);
     }
   }
 
   throw lastErr;
+}
+
+async function queryGemini(prompt) {
+  return withGeminiRetry(() => callGemini(prompt), 'Gemini');
 }
 
 async function callGemini(prompt) {
@@ -60,4 +72,4 @@ async function callGemini(prompt) {
   return { text, citations };
 }
 
-module.exports = { queryGemini };
+module.exports = { queryGemini, withGeminiRetry, isTransientError };
