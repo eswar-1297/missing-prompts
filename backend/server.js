@@ -6,6 +6,15 @@ const rateLimit = require('express-rate-limit');
 const analysisRouter = require('./routes/analysis');
 const gapAnalysisRouter = require('./routes/gapAnalysis');
 
+// Fail loudly at boot if API keys are missing. The .env file is gitignored, so a fresh
+// deployment that doesn't set these in its environment will otherwise only surface as
+// confusing "API key not valid" errors at request time.
+const missingKeys = ['GEMINI_API_KEY', 'OPENAI_API_KEY'].filter(k => !process.env[k]);
+if (missingKeys.length > 0) {
+  console.error(`[CONFIG] Missing required env var(s): ${missingKeys.join(', ')}. ` +
+    `Set them in this environment (e.g. host config / .env) — they are NOT in the repo.`);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 

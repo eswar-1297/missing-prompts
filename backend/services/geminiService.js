@@ -39,8 +39,13 @@ async function withGeminiRetry(fn, label = 'Gemini') {
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (!isTransientError(err) || attempt === MAX_RETRIES) throw err;
-      console.warn(`[${label}] transient error on attempt ${attempt + 1} (${(err.message || '').slice(0, 80)}), retrying after backoff...`);
+      const giveUp = !isTransientError(err) || attempt === MAX_RETRIES;
+      if (giveUp) {
+        // Log the FULL error (status + message) so deployment issues are diagnosable.
+        console.error(`[${label}] giving up after ${attempt + 1} attempt(s). status=${err?.status ?? 'n/a'} message=${err?.message || err}`);
+        throw err;
+      }
+      console.warn(`[${label}] transient error on attempt ${attempt + 1}: status=${err?.status ?? 'n/a'} ${(err?.message || '').slice(0, 200)} — retrying after backoff...`);
     }
   }
 
