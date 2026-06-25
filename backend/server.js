@@ -1,4 +1,6 @@
 require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -19,7 +21,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
-app.use(helmet());
+// CSP disabled because this server also serves the bundled React app (CRA inlines a small
+// runtime script that a default CSP would block). Safe for this internal tool.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
@@ -42,6 +46,18 @@ app.use('/api', analysisRouter);
 app.use('/api', gapAnalysisRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+
+// Serve the bundled React production build (single-service deploy). When the build exists,
+// static assets are served and any non-API GET falls back to index.html for the SPA. Guarded
+// by existsSync so local dev (where the frontend runs separately on :3001) is unaffected.
+const buildDir = path.join(__dirname, '..', 'frontend', 'build');
+if (fs.existsSync(buildDir)) {
+  app.use(express.static(buildDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.sendFile(path.join(buildDir, 'index.html'));
+  });
+}
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
