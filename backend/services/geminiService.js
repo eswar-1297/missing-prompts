@@ -39,10 +39,17 @@ async function withGeminiRetry(fn, label = 'Gemini') {
       return await fn();
     } catch (err) {
       lastErr = err;
-      const giveUp = !isTransientError(err) || attempt === MAX_RETRIES;
+      // A bad/misconfigured key fails every time — retry it at most once (a rare transient
+      // 400 under load clears on the first retry) instead of burning all MAX_RETRIES.
+      const keyInvalid = /API_KEY_INVALID|API key not valid/i.test(err?.message || '');
+      const maxForThis = keyInvalid ? 1 : MAX_RETRIES;
+      const giveUp = !isTransientError(err) || attempt >= maxForThis;
       if (giveUp) {
         // Log the FULL error (status + message) so deployment issues are diagnosable.
         console.error(`[${label}] giving up after ${attempt + 1} attempt(s). status=${err?.status ?? 'n/a'} message=${err?.message || err}`);
+        if (keyInvalid) {
+          console.error(`[${label}] -> The GEMINI_API_KEY in this environment is being rejected by Google. Check the value (no quotes/spaces, 39 chars, starts AIzaSy) and any IP/referrer restrictions on the key.`);
+        }
         throw err;
       }
       console.warn(`[${label}] transient error on attempt ${attempt + 1}: status=${err?.status ?? 'n/a'} ${(err?.message || '').slice(0, 200)} — retrying after backoff...`);
