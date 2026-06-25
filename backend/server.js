@@ -16,6 +16,14 @@ if (missingKeys.length > 0) {
   console.error(`[CONFIG] Missing required env var(s): ${missingKeys.join(', ')}. ` +
     `Set them in this environment (e.g. host config / .env) — they are NOT in the repo.`);
 }
+// Log key shape (not the secret) so deployment logs reveal a malformed value at a glance.
+// A Gemini key should be length=39, prefix=AIza, hasWhitespace=false.
+for (const k of ['GEMINI_API_KEY', 'OPENAI_API_KEY']) {
+  const v = process.env[k] || '';
+  if (v) {
+    console.log(`[CONFIG] ${k}: length=${v.length}, prefix=${v.slice(0, 4)}, hasWhitespace=${/\s/.test(v)}`);
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;

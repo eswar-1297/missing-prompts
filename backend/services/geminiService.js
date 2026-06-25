@@ -1,6 +1,8 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// .trim() guards against a trailing newline/space sneaking in via a dashboard paste —
+// a very common cause of "API key not valid" that works locally but fails in deployment.
+const genAI = new GoogleGenerativeAI((process.env.GEMINI_API_KEY || '').trim());
 
 const MAX_RETRIES = 4;
 const BASE_DELAY_MS = 3000;

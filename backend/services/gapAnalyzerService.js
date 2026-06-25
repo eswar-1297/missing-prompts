@@ -5,8 +5,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { fetchPageContent } = require('./pageContentService');
 const { withGeminiRetry } = require('./geminiService');
 
-const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// .trim() guards against a trailing newline/space from a dashboard paste breaking the key.
+const openaiClient = new OpenAI({ apiKey: (process.env.OPENAI_API_KEY || '').trim() });
+const genAI = new GoogleGenerativeAI((process.env.GEMINI_API_KEY || '').trim());
 
 const CLOUDFUZE_FALLBACK_URL = 'https://www.cloudfuze.com/';
 
