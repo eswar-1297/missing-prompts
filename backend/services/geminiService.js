@@ -41,16 +41,22 @@ async function withGeminiRetry(fn, label = 'Gemini') {
       return await fn();
     } catch (err) {
       lastErr = err;
-      // A bad/misconfigured key fails every time — retry it at most once (a rare transient
-      // 400 under load clears on the first retry) instead of burning all MAX_RETRIES.
-      const keyInvalid = /API_KEY_INVALID|API key not valid/i.test(err?.message || '');
-      const maxForThis = keyInvalid ? 1 : MAX_RETRIES;
+      // Some failures are permanent until a human acts — retrying them just wastes time and
+      // floods the logs. Fail fast on those; only true transient errors get the full retries.
+      const msg = err?.message || '';
+      const keyInvalid = /API_KEY_INVALID|API key not valid/i.test(msg);
+      const billingExhausted = /prepayment credits|credits are depleted|\bbilling\b|quota.*exceeded/i.test(msg);
+      // billing: 0 retries (never clears on its own). bad key: 1 (rare transient 400 under load). else: full.
+      const maxForThis = billingExhausted ? 0 : (keyInvalid ? 1 : MAX_RETRIES);
       const giveUp = !isTransientError(err) || attempt >= maxForThis;
       if (giveUp) {
         // Log the FULL error (status + message) so deployment issues are diagnosable.
-        console.error(`[${label}] giving up after ${attempt + 1} attempt(s). status=${err?.status ?? 'n/a'} message=${err?.message || err}`);
+        console.error(`[${label}] giving up after ${attempt + 1} attempt(s). status=${err?.status ?? 'n/a'} message=${msg || err}`);
         if (keyInvalid) {
           console.error(`[${label}] -> The GEMINI_API_KEY in this environment is being rejected by Google. Check the value (no quotes/spaces, 39 chars, starts AIzaSy) and any IP/referrer restrictions on the key.`);
+        }
+        if (billingExhausted) {
+          console.error(`[${label}] -> Google billing/quota is exhausted for this key's project. Add credits / enable billing in AI Studio, or use a key from a project with available quota.`);
         }
         throw err;
       }
